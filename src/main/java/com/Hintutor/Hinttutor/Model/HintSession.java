@@ -1,6 +1,8 @@
 package com.Hintutor.Hinttutor.Model;
 
 
+import com.Hintutor.Hinttutor.Dto.SessionStatus;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +16,7 @@ public class HintSession {
 
     private int hintIndex;
     private int tokensUsed;
-
+    private SessionStatus status = SessionStatus.ACTIVE;
     private LocalDateTime createdAt;
     private LocalDateTime lastActive;
 
@@ -65,7 +67,15 @@ public class HintSession {
     public List<String> getConversationHistory() {
         return conversationHistory;
     }
-
+    public SessionStatus getStatus() {
+        return status;
+    }
+    public List<String> getMessages() {
+        return conversationHistory;
+    }
+    public void setStatus(SessionStatus status) {
+        this.status = status;
+    }
     public void addMessage(String message) {
 
         conversationHistory.add(message);

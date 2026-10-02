@@ -1,6 +1,8 @@
 package com.Hintutor.Hinttutor.Service;
 
 
+import com.Hintutor.Hinttutor.Dto.AnswerEvaluation;
+import com.Hintutor.Hinttutor.Dto.SessionStatus;
 import com.Hintutor.Hinttutor.Model.HintSession;
 import com.Hintutor.Hinttutor.Repository.HintSessionRepository;
 
@@ -37,7 +39,137 @@ public class HintTutorService {
             4. Keep the hint short, between 1 and 3 sentences.
             5. Encourage the student to think independently.
             """;
+    private static final String EVALUATOR_PROMPT = """
+    You are an evaluator for a programming tutor.
 
+    Evaluate the student's latest answer using the
+    original question and the conversation history.
+
+    Rules:
+    1. Determine whether the student has demonstrated
+       sufficient understanding of the problem.
+    2. Do not mark an answer correct merely because
+       the student says they understand.
+    3. If the answer is correct and demonstrates the
+       required understanding, set understood to true.
+    4. If the answer is incomplete or incorrect,
+       set understood to false.
+    5. Give brief feedback.
+    6. If the student needs help, provide exactly one
+       new hint that does not repeat previous hints.
+    7. If understood is true, nextHint must be empty.
+    """;
+    public Map<String, Object> submitAnswer(
+            UUID sessionId,
+            String answer) {
+
+        if (answer == null || answer.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Answer cannot be empty");
+        }
+
+        HintSession session = sessionRepository.findById(sessionId);
+
+
+        // Do not evaluate finished sessions again.
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            return Map.of(
+                    "sessionId", session.getId(),
+                    "status", session.getStatus().name(),
+                    "feedback", "This session is already finished.",
+                    "hint", "",
+                    "hintIndex", session.getHintIndex()
+            );
+        }
+
+        // Include all previously stored messages.
+        String history = String.join(
+                "\n",
+                session.getMessages()
+        );
+
+        String evaluationInput = """
+                Original question:
+                %s
+
+                Previous conversation:
+                %s
+
+                Latest student answer:
+                %s
+
+                Evaluate the latest answer.
+                """.formatted(
+                session.getQuestion(),
+                history,
+                answer
+        );
+
+        // Ask AI to evaluate the answer.
+        AnswerEvaluation evaluation = chatClient
+                .prompt()
+                .system(EVALUATOR_PROMPT)
+                .user(evaluationInput)
+                .call()
+                .entity(AnswerEvaluation.class);
+
+        if (evaluation == null ||
+                evaluation.feedback() == null ||
+                evaluation.feedback().isBlank()) {
+            throw new IllegalStateException(
+                    "Invalid evaluation from AI");
+        }
+
+        session.addMessage("Student answer: " + answer);
+        session.addMessage(
+                "Tutor feedback: " + evaluation.feedback()
+        );
+
+        String hint = "";
+
+        if (evaluation.understood()) {
+
+            // Stop giving hints.
+            session.setStatus(SessionStatus.UNDERSTOOD);
+
+        } else {
+
+            // Generate the next hint.
+
+            String evalautionHint=evaluation.nextHint();
+            if (evalautionHint == null || evalautionHint.isBlank()) {
+                throw new IllegalStateException(
+                        "AI did not generate the next hint");
+            }
+
+            // Prevent exact repetitions.
+            boolean repeated = session.getMessages()
+                    .stream()
+                    .anyMatch(message ->
+                            message.equals("Tutor hint: " + evalautionHint));
+
+            if (repeated) {
+                throw new IllegalStateException(
+                        "AI repeated a previous hint");
+            }
+            if (!repeated) {
+                hint = evalautionHint;
+            }
+            session.addMessage("Tutor hint: " + hint);
+            session.incrementHintIndex();
+        }
+
+        sessionRepository.save(session);
+
+        return Map.of(
+                "sessionId", session.getId(),
+                "status", session.getStatus().name(),
+                "feedback", evaluation.feedback(),
+                "hint", hint,
+                "hintIndex", session.getHintIndex(),
+                "tokensUsed", session.getTokensUsed()
+        );
+    }
     public Map<String, Object> startSession(String question) {
 
         if (question == null || question.isBlank()) {

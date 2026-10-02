@@ -62,7 +62,7 @@ public class HintTutorController {
         try {
 
             Map<String, Object> response =
-                    hintTutorService.nextHint(
+                    hintTutorService.submitAnswer(
                             id,
                             request.getUserAttempt()
                     );
