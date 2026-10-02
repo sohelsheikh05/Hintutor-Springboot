@@ -46,19 +46,24 @@ public class HintTutorService {
                     "Question cannot be empty"
             );
         }
-
+        System.out.println("instatsession");
         HintSession session = new HintSession(question);
-
-        String hint = chatClient
-                .prompt()
-                .system(SYSTEM_PROMPT)
-                .user(question)
-                .call()
-                .content();
+        String hint="";
+        try {
+             hint = chatClient
+                    .prompt()
+                    .system(SYSTEM_PROMPT)
+                    .user(question)
+                    .call()
+                    .content();
+        }
+        catch (Exception e){
+            System.out.println(e);
+        }
         session.addMessage("Student question: " + question);
         session.addMessage("Tutor hint: " + hint);
         session.incrementHintIndex();
-
+        System.out.println("instatsession"+hint);
         sessionRepository.save(session);
 
         return Map.of(
@@ -187,7 +192,7 @@ public class HintTutorService {
             2. Include code when appropriate.
             3. Explain the time and space complexity.
             4. Correct any misunderstandings in the student's attempts.
-            5. Use beginner-friendly language.
+            5. Use beginner-friendly language. 
             """.formatted(
                 session.getQuestion(),
                 conversation

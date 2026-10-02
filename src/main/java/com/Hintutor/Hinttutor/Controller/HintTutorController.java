@@ -28,7 +28,7 @@ public class HintTutorController {
     public ResponseEntity<?> start(
             @RequestBody StartRequest request
     ) {
-
+        System.out.println("in start");
         Map<String, Object> response =
                 hintTutorService.startSession(
                         request.getQuestion()
